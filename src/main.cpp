@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+#include "HX711-multi.h"
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
@@ -13,11 +14,12 @@
 MPU6050 mpu;
 
 //display yaw, pitch and roll values
-// #define OUTPUT_READABLE_YAWPITCHROLL
+#define OUTPUT_READABLE_YAWPITCHROLL
 
 //use yaw, pitch and roll values for visualization on Processing
-#define OUTPUT_TEAPOT
+// #define OUTPUT_TEAPOT
 
+//Pins for MPU6050
 #define INTERRUPT_PIN 23
 #define SDA 21
 #define SCL 22
@@ -42,6 +44,24 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
+// Pins to the HX711
+#define CLK 5      // clock pin to the HX711
+// #define DOUT1 26    // data pin to the first HX711
+#define DOUT2 27    // data pin to the second HX711
+#define DOUT3 13    // data pin to the third HX711
+#define DOUT4 25    // data pin to the fourth HX711
+#define DOUT5 12    // data pin to the fifth HX711
+// #define DOUT6 14    // data pin to the sixth HX711
+
+#define TARE_TIMEOUT_SECONDS 4
+
+byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
+
+#define CHANNEL_COUNT sizeof(DOUTS)/sizeof(byte)
+
+long int results[CHANNEL_COUNT];
+
+HX711MULTI scales(CHANNEL_COUNT, DOUTS, CLK);
 
 
 // ================================================================
@@ -53,7 +73,19 @@ void dmpDataReady() {
     mpuInterrupt = true;
 }
 
+// ================================================================
+// ===               LOAD CELL TARE CODE                        ===
+// ================================================================
 
+void tare() {
+  bool tareSuccessful = false;
+
+  unsigned long tareStartTime = millis();
+  while (!tareSuccessful && millis()<(tareStartTime+TARE_TIMEOUT_SECONDS*1000)) {
+    tareSuccessful = scales.tare(20,10000);  //reject 'tare' if still ringing
+    Serial.println(tareSuccessful);
+  }
+}
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -62,9 +94,8 @@ void dmpDataReady() {
 void setup() {
     // initialize serial communication
     Serial.begin(115200);
-    // (115200 chosen because it is required for Teapot Demo output, but it's
-    // really up to you depending on your project)
-    
+    Serial.flush();
+    tare();
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
       Wire.begin(SDA, SCL);
@@ -128,13 +159,29 @@ void setup() {
     }
 }
 
-
+void sendRawData() {
+  scales.read(results);
+  for (int i=0; i<scales.get_count(); ++i) {;
+    Serial.print( -results[i]);  
+    Serial.print( (i!=scales.get_count()-1)?"\t":"\n");
+  }  
+  delay(10);
+}
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
 void loop() {
+    sendRawData(); //this is for sending raw data, for where everything else is done in processing
+
+    //on serial data (any data) re-tare
+    if (Serial.available()>0) {
+        while (Serial.available()) {
+            Serial.read();
+        }
+        tare();
+    }
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO

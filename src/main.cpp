@@ -4,6 +4,8 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "HX711-multi.h"
+// int button; //input free digital pin 
+// int buttonState = 0; // 
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
@@ -52,7 +54,6 @@ uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\
 #define DOUT4 25    // data pin to the fourth HX711
 #define DOUT5 12    // data pin to the fifth HX711
 // #define DOUT6 14    // data pin to the sixth HX711
-
 #define TARE_TIMEOUT_SECONDS 4
 
 byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
@@ -78,14 +79,16 @@ void dmpDataReady() {
 // ================================================================
 
 void tare() {
-  bool tareSuccessful = false;
+    bool tareSuccessful = false;
 
-  unsigned long tareStartTime = millis();
-  while (!tareSuccessful && millis()<(tareStartTime+TARE_TIMEOUT_SECONDS*1000)) {
-    tareSuccessful = scales.tare(20,10000);  //reject 'tare' if still ringing
+    unsigned long tareStartTime = millis();
+    while (!tareSuccessful && millis()<(tareStartTime+TARE_TIMEOUT_SECONDS*1000)) {
+        tareSuccessful = scales.tare(20,10000);  //reject 'tare' if still ringing
+    
     Serial.println(tareSuccessful);
   }
 }
+
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -96,6 +99,7 @@ void setup() {
     Serial.begin(115200);
     Serial.flush();
     tare();
+    // pinMode(button,INPUT); // setting up reset pin
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
       Wire.begin(SDA, SCL);
@@ -160,20 +164,34 @@ void setup() {
 }
 
 void sendRawData() {
-  scales.read(results);
-  for (int i=0; i<scales.get_count(); ++i) {;
-    Serial.print( -results[i]);  
-    Serial.print( (i!=scales.get_count()-1)?"\t":"\n");
+    scales.read(results);
+    for (int i=0; i<scales.get_count(); ++i) {;
+        Serial.print(-results[i]);  
+        Serial.print((i!=scales.get_count()-1)?"\t":"\n");
   }  
-  delay(10);
+    delay(10);
 }
+
+// void sendWeightData() {
+//     scales.get_units(weights);
+// 	for (int i = 0; i < scales.get_count(); ++i) {
+// 		Serial.print(-weights[i]);
+// 		Serial.print((i != scales.get_count() - 1) ? "\t" : "\n");
+// 	}
+// 	delay(10);
+// }
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
 void loop() {
-    sendRawData(); //this is for sending raw data, for where everything else is done in processing
+    sendRawData();
+    // buttonState =  digitalRead(button);
+    // if(buttonState == HIGH){
+    //     scales.tare();
+    // }
+    scales.tare(); // this is for sending raw data, for where everything else is done in processing
 
     //on serial data (any data) re-tare
     if (Serial.available()>0) {

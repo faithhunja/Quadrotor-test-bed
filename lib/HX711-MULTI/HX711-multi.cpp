@@ -18,15 +18,20 @@ HX711MULTI::HX711MULTI(int count, byte *dout, byte pd_sck, byte gain)
 
 	
 	OFFSETS = (long *)malloc(COUNT * sizeof(long));
+	SCALES = (float *) malloc(COUNT*sizeof(float));
+
 	for (int i = 0; i < COUNT; ++i)
 	{
 		OFFSETS[i] = 0;
+		SCALES[i] = 1.0;
+
 	}
 }
 
 HX711MULTI::~HX711MULTI()
 {
 	free(OFFSETS);
+	free(SCALES);
 }
 
 bool HX711MULTI::is_ready()
@@ -241,6 +246,22 @@ void HX711MULTI::power_up()
 void HX711MULTI::setTimeOut(int timeout)
 {
 	TIMEOUT = timeout;
+}
+
+float* HX711MULTI::get_scales() {
+	return SCALES;
+}
+
+void HX711MULTI::set_scales(float *_scales) {
+	SCALES = _scales;
+}
+
+void HX711MULTI::get_units(double *result) {
+	long int rawResult[COUNT];
+	read(rawResult);
+	for (int i = 0; i < COUNT; ++i) {
+		result[i] = ((double) rawResult[i]) / SCALES[i];
+	}
 }
 
 void HX711MULTI::forceRead(){

@@ -89,6 +89,10 @@ void tare() {
   }
 }
 
+float calibratingFactor[CHANNEL_COUNT];
+
+void calibrateSequence(void);
+
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -99,6 +103,7 @@ void setup() {
     Serial.begin(115200);
     Serial.flush();
     tare();
+    calibrateSequence();
     // pinMode(button,INPUT); // setting up reset pin
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -169,6 +174,14 @@ void sendRawData() {
         Serial.print(-results[i]);  
         Serial.print((i!=scales.get_count()-1)?"\t":"\n");
   }  
+  Serial.print("calibrated result: ");
+  for (size_t i = 0; i < scales.get_count(); i++)
+  {
+    Serial.print(results[i]/calibratingFactor[i]);
+    Serial.print(", ");
+  }
+  Serial.println();
+  
     delay(10);
 }
 
@@ -232,4 +245,59 @@ void loop() {
             teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
         #endif
     }
+}
+
+void calibrateSequence(void) {
+    Serial.print("load reference weight");
+  for (int i=0;i<5;i++){
+    Serial.print(".");
+    delay(1000);    
+  }
+  Serial.println();
+  
+  int sampleCount = 0;
+  float sampleSum[4];
+  for (int i=0; i < 4; i++){
+    sampleSum[i] = 0;
+  }
+  while(sampleCount != 10){
+    if (scales.is_ready()){
+        Serial.println("got reading");
+        sampleCount++;
+        scales.read(results);
+        for(int i=0;i <4; i++){
+            sampleSum[i] += results[i];
+        }
+    }
+    delay(100);
+  }
+  float averageReading[4];
+  for(int i = 0; i < 4; i++){
+    averageReading[i] = sampleSum[i] / 10.0;
+  }
+  Serial.println("Average Readings");
+  for(int i = 0; i < 4; i++){
+    Serial.print(i);
+    Serial.print(" : ");
+    Serial.println(averageReading[i]);
+  }
+
+  Serial.print("remove reference weight");
+  for (int i=0;i<5;i++){
+    Serial.print(".");
+    delay(1000);    
+  }
+  Serial.println();
+
+  Serial.print("input reference weight [g]: ");
+  while(Serial.available() == 0) {} 
+  float reference_i= Serial.readStringUntil('\n').toFloat();
+  Serial.println(reference_i);
+  for (size_t i = 0; i < 4; i++)
+  {
+    calibratingFactor[i] = averageReading[i] / (reference_i / 4);
+  }
+  
+  tare();
+  Serial.println("calibration done");
 }

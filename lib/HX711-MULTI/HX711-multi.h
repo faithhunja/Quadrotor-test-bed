@@ -18,7 +18,7 @@ class HX711MULTI
 		bool debugEnabled; //print debug messages?
 
 		long *OFFSETS;	// used for tare weight
-		float SCALES;	// used to return weight in grams, kg, ounces, whatever
+		float *SCALES;	// used to return weight in grams, kg, ounces, whatever
 		long int TIMEOUT = 300;
 
 	public:

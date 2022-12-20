@@ -9,8 +9,10 @@
 #include "ThingSpeak.h"
 
 // Network information
-const char* ssid = "MWIHAKI-JERU98 2223";
-const char* password = "wE705*93";
+// const char* ssid = "MWIHAKI-JERU98 2223";
+// const char* password = "wE705*93";
+const char* ssid = "Sasha";
+const char* password = "sasha2002!";
 
 // Initialize the Ethernet client library
 // with the IP address and port of the server
@@ -77,14 +79,17 @@ uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\
 // #define DOUT6 14    // data pin to the sixth HX711
 #define TARE_TIMEOUT_SECONDS 4
 
-// byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
-byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT3};
+// byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT3};
+byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
 
 
 #define CHANNEL_COUNT sizeof(DOUTS)/sizeof(byte)
 
 long int results[CHANNEL_COUNT];
-long int calibratedResult;
+float calibrResult[20];
+float calibratedResult;
+float average;
+char j;
 long int thrust;
 long int pitch;
 long int roll;
@@ -205,12 +210,24 @@ void sendRawData() {
         Serial.print((i!=scales.get_count()-1)?"\t":"\n");
     }  
     Serial.print("calibrated result: ");
+
+    float rightLC  = results[0]/calibratingFactor[0];
+    float frontLC  = results[1]/calibratingFactor[1];
+    float leftLC  = results[2]/calibratingFactor[2];
+    float backLC  = results[3]/calibratingFactor[3];
+
+    float thrust = rightLC + frontLC + leftLC + backLC;
+    float pitch = rightLC + frontLC + leftLC + backLC;
+    float right_roll = rightLC;
+    float left_roll = leftLC;
+
 for (size_t i = 0; i < scales.get_count(); i++)
 {
-    // calibratedResult = results[i]/calibratingFactor[i];
     Serial.print(results[i]/calibratingFactor[i]);
     Serial.print(", ");
+    // Serial.println();
 }
+
     // for (int i=0; i<scales.get_count(); ++i) {;
     //     pitch +=i;
     //     Serial.print((i!=scales.get_count()-1)?"\t":"\n");
@@ -219,6 +236,19 @@ for (size_t i = 0; i < scales.get_count(); i++)
   
     delay(10);
 }
+
+// void calibrationAverage() {
+//     for (j=0; j<20; j++) {
+//         calibrResult[j] = calibratedResult;
+//         delay(10);
+//     }
+//     average = 0;
+//     for (j = 0; j < 20; j++) {
+//     average = average + calibrResult[j]; // add them up
+//     }
+//     average = average / 20;
+//     Serial.println(average);
+// }
 
 // void sendWeightData() {
 //     thrust;
@@ -251,12 +281,7 @@ void loop() {
       } 
       Serial.println("\nConnected.");
     }
-    // Get a new temperature reading
-    // temperatureC = bme.readTemperature();
-    // Serial.println(thrust);
-    thrust = 10;
-    pitch = 20;
-    roll = 40;
+
     
     // Write to ThingSpeak. There are up to 8 fields in a channel, allowing you to store up to 8 different
     // pieces of information in a channel.  Here, we write to field 1.
@@ -308,6 +333,7 @@ void loop() {
         #endif
     }
     sendRawData();
+    // calibrationAverage();
     // buttonState =  digitalRead(button);
     // if(buttonState == HIGH){
     //     scales.tare();

@@ -4,6 +4,27 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "HX711-multi.h"
+#include "pubsubclient.h"
+#include "WiFi.h" 
+#include "ThingSpeak.h"
+
+// Network information
+const char* ssid = "MWIHAKI-JERU98 2223";
+const char* password = "wE705*93";
+
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
+WiFiClient client;
+// PubSubClient mqttClient( client );    // Initialize the PuBSubClient library.
+
+unsigned long myChannelNumber = 1;
+const char * myWriteAPIKey = "IPS2Q2F9D3OR3WK9";
+
+// Timer variables
+unsigned long lastTime = 0;
+unsigned long timerDelay = 30000;
+
 // int button; //input free digital pin 
 // int buttonState = 0; // 
 
@@ -56,11 +77,17 @@ uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\
 // #define DOUT6 14    // data pin to the sixth HX711
 #define TARE_TIMEOUT_SECONDS 4
 
-byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
+// byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT5};
+byte DOUTS[4] = {DOUT2, DOUT3, DOUT4, DOUT3};
+
 
 #define CHANNEL_COUNT sizeof(DOUTS)/sizeof(byte)
 
 long int results[CHANNEL_COUNT];
+long int calibratedResult;
+long int thrust;
+long int pitch;
+long int roll;
 
 HX711MULTI scales(CHANNEL_COUNT, DOUTS, CLK);
 
@@ -102,7 +129,9 @@ void setup() {
     // initialize serial communication
     Serial.begin(115200);
     // Serial.flush();
-    
+    WiFi.mode(WIFI_STA);   
+  
+    ThingSpeak.begin(client);  // Initialize ThingSpeak
     // pinMode(button,INPUT); // setting up reset pin
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -174,17 +203,28 @@ void sendRawData() {
     for (int i=0; i<scales.get_count(); ++i) {;
         Serial.print(-results[i]);  
         Serial.print((i!=scales.get_count()-1)?"\t":"\n");
-  }  
-  Serial.print("calibrated result: ");
-  for (size_t i = 0; i < scales.get_count(); i++)
-  {
+    }  
+    Serial.print("calibrated result: ");
+for (size_t i = 0; i < scales.get_count(); i++)
+{
+    // calibratedResult = results[i]/calibratingFactor[i];
     Serial.print(results[i]/calibratingFactor[i]);
     Serial.print(", ");
-  }
-  Serial.println();
+}
+    // for (int i=0; i<scales.get_count(); ++i) {;
+    //     pitch +=i;
+    //     Serial.print((i!=scales.get_count()-1)?"\t":"\n");
+    // } 
+    Serial.println();
   
     delay(10);
 }
+
+// void sendWeightData() {
+//     thrust;
+//     pitch;
+//     roll;
+// }
 
 // void sendWeightData() {
 //     scales.get_units(weights);
@@ -200,6 +240,41 @@ void sendRawData() {
 // ================================================================
 
 void loop() {
+    if ((millis() - lastTime) > timerDelay) {
+    
+    // Connect or reconnect to WiFi
+    if(WiFi.status() != WL_CONNECTED){
+      Serial.print("Attempting to connect");
+      while(WiFi.status() != WL_CONNECTED){
+        WiFi.begin(ssid, password); 
+        delay(5000);     
+      } 
+      Serial.println("\nConnected.");
+    }
+    // Get a new temperature reading
+    // temperatureC = bme.readTemperature();
+    // Serial.println(thrust);
+    thrust = 10;
+    pitch = 20;
+    roll = 40;
+    
+    // Write to ThingSpeak. There are up to 8 fields in a channel, allowing you to store up to 8 different
+    // pieces of information in a channel.  Here, we write to field 1.
+    int thr = ThingSpeak.writeField(myChannelNumber, 1, thrust, myWriteAPIKey);
+    int p = ThingSpeak.writeField(myChannelNumber, 2, pitch, myWriteAPIKey);
+    int r = ThingSpeak.writeField(myChannelNumber, 3, roll, myWriteAPIKey);
+    // int yaw = ThingSpeak.writeField(myChannelNumber, 4, temperatureC, myWriteAPIKey);
+    //uncomment if you want to get temperature in Fahrenheit
+    //int x = ThingSpeak.writeField(myChannelNumber, 1, temperatureF, myWriteAPIKey);
+
+    // if(x == 200){
+    //   Serial.println("Channel update successful.");
+    // }
+    // else{
+    //   Serial.println("Problem updating channel. HTTP error code " + String(x));
+    // }
+    lastTime = millis();
+  }
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
